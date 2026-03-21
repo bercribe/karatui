@@ -9,7 +9,10 @@ use ratatui::{
 };
 use tokio::runtime::Runtime;
 
-use crate::api;
+use crate::{
+    api,
+    conf::{self},
+};
 
 struct BookmarkItem {
     bookmark: api::Bookmark,
@@ -19,6 +22,8 @@ struct BookmarkItem {
 }
 
 pub struct App {
+    // config
+    config: conf::Config,
     // api
     bookmarks: Vec<BookmarkItem>,
     available_tags: Vec<String>,
@@ -45,11 +50,13 @@ enum Mode {
 
 impl App {
     pub fn new(
+        config: conf::Config,
         bookmarks: &[api::Bookmark],
         available_tags: &[String],
         available_lists: &[String],
     ) -> Self {
         let mut app = Self {
+            config,
             bookmarks: bookmarks
                 .iter()
                 .map(|b| BookmarkItem {
@@ -300,7 +307,9 @@ impl App {
                         }
                         self.status_message = format!("Saving {} bookmarks...", dirty_count);
                         let rt = Runtime::new()?;
-                        rt.block_on(async { api::save_bookmarks(&dirty_bookmarks).await })?;
+                        rt.block_on(async {
+                            api::save_bookmarks(&self.config, &dirty_bookmarks).await
+                        })?;
                         self.status_message = format!("Saved {} bookmarks!", dirty_count);
                     }
                     _ => {}

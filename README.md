@@ -2,7 +2,7 @@
 
 A terminal user interface for [Karakeep](https://karakeep.app/)
 
-**Warning: this is still very WIP!**
+**Warning: this is still WIP!**
 
 Demo:
 ![Demo](./demo.svg)
@@ -14,12 +14,16 @@ I made this because I got tired of clicking around the web UI when I wanted to o
 - tag and list suggestions based on your existing bookmarks
 - open links from the terminal
 
-If you want to use this early version, you'll need to set some environment variables:
+## Installation
+You can build this from source with `cargo build`, or using nix with `nix build`.
+
+## Config
+karatui reads from ~/.config/karatui/karatui.toml. The config should appear as follows:
 ```
 # set to your instance URL
-export KARAKEEP_URL=https://try.karakeep.app
-# generate from your server settings
-export KARAKEEP_API_KEY=xxx_xxxxxxxxxxxxxxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+url = "https://try.karakeep.app"
 # the list you want to load - this is shown in the URL when you select a list
-export KARAKEEP_LIST_ID=xxxxxxxxxxxxxxxxxxxxxxxx
+list_id = "xxxxxxxxxxxxxxxxxxxxxxxx"
+# generate from your server settings
+api_key_path = "/path/to/api_key"
 ```

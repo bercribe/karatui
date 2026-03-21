@@ -1,7 +1,9 @@
-use std::{collections::HashMap, env};
+use std::collections::HashMap;
 
 use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
+
+use crate::conf;
 
 #[derive(Clone)]
 pub struct Bookmark {
@@ -98,11 +100,10 @@ struct TagUpdateRequest {
     tags: Vec<TagUpdate>,
 }
 
-pub async fn fetch_bookmarks() -> Result<Vec<Bookmark>> {
-    let url = env::var("KARAKEEP_URL")?;
-    // TODO: clean up
-    let key = env::var("KARAKEEP_API_KEY")?;
-    let list_id = env::var("KARAKEEP_LIST_ID")?;
+pub async fn fetch_bookmarks(config: &conf::Config) -> Result<Vec<Bookmark>> {
+    let url = &config.url;
+    let key = &config.api_key;
+    let list_id = &config.list_id;
 
     let client = reqwest::Client::builder().build()?;
 
@@ -132,12 +133,12 @@ pub async fn fetch_bookmarks() -> Result<Vec<Bookmark>> {
         }
     }
 
-    let all_lists = fetch_lists().await?;
+    let all_lists = fetch_lists(config).await?;
     let lists_map: HashMap<&String, &List> = all_lists.iter().map(|l| (&l.id, l)).collect();
 
     let mut bookmarks: Vec<Bookmark> = Vec::new();
     for b in api_bookmarks {
-        let lists = fetch_bookmark_lists(&b.id, &lists_map).await?;
+        let lists = fetch_bookmark_lists(config, &b.id, &lists_map).await?;
         let bookmark = Bookmark {
             id: b.id.clone(),
             url: b
@@ -162,26 +163,26 @@ pub async fn fetch_bookmarks() -> Result<Vec<Bookmark>> {
     Ok(bookmarks)
 }
 
-pub async fn fetch_available_tags() -> Result<Vec<String>> {
-    let tags = fetch_tags().await?;
+pub async fn fetch_available_tags(config: &conf::Config) -> Result<Vec<String>> {
+    let tags = fetch_tags(config).await?;
     Ok(tags.iter().map(|t| t.name.clone()).collect())
 }
 
-pub async fn fetch_available_lists() -> Result<Vec<String>> {
-    let lists = fetch_lists().await?;
+pub async fn fetch_available_lists(config: &conf::Config) -> Result<Vec<String>> {
+    let lists = fetch_lists(config).await?;
     Ok(lists.iter().map(|l| l.name.clone()).collect())
 }
 
-pub async fn save_bookmarks(bookmarks: &[&Bookmark]) -> Result<()> {
-    let url = env::var("KARAKEEP_URL")?;
-    let key = env::var("KARAKEEP_API_KEY")?;
+pub async fn save_bookmarks(config: &conf::Config, bookmarks: &[&Bookmark]) -> Result<()> {
+    let url = &config.url;
+    let key = &config.api_key;
 
-    let tags = fetch_tags().await?;
+    let tags = fetch_tags(config).await?;
     let mut tag_id_map: HashMap<String, String> = tags
         .iter()
         .map(|t| (t.name.clone(), t.id.clone()))
         .collect();
-    let all_lists = fetch_lists().await?;
+    let all_lists = fetch_lists(config).await?;
     let list_id_map: HashMap<&String, &List> = all_lists.iter().map(|l| (&l.id, l)).collect();
     let list_name_map: HashMap<&String, &List> = all_lists.iter().map(|l| (&l.name, l)).collect();
 
@@ -292,7 +293,7 @@ pub async fn save_bookmarks(bookmarks: &[&Bookmark]) -> Result<()> {
         response.text().await?;
 
         // get current list state
-        let current_lists = fetch_bookmark_lists(&bookmark.id, &list_id_map).await?;
+        let current_lists = fetch_bookmark_lists(config, &bookmark.id, &list_id_map).await?;
         let current_list_names: Vec<&String> = current_lists.iter().map(|l| &l.name).collect();
         let lists_to_add = (bookmark
             .lists
@@ -339,9 +340,9 @@ pub async fn save_bookmarks(bookmarks: &[&Bookmark]) -> Result<()> {
     Ok(())
 }
 
-async fn fetch_tags() -> Result<Vec<Tag>> {
-    let url = env::var("KARAKEEP_URL")?;
-    let key = env::var("KARAKEEP_API_KEY")?;
+async fn fetch_tags(config: &conf::Config) -> Result<Vec<Tag>> {
+    let url = &config.url;
+    let key = &config.api_key;
 
     let client = reqwest::Client::builder().build()?;
 
@@ -374,9 +375,9 @@ async fn fetch_tags() -> Result<Vec<Tag>> {
     Ok(tags)
 }
 
-async fn fetch_lists() -> Result<Vec<List>> {
-    let url = env::var("KARAKEEP_URL")?;
-    let key = env::var("KARAKEEP_API_KEY")?;
+async fn fetch_lists(config: &conf::Config) -> Result<Vec<List>> {
+    let url = &config.url;
+    let key = &config.api_key;
 
     let client = reqwest::Client::builder().build()?;
 
@@ -412,11 +413,12 @@ async fn fetch_lists() -> Result<Vec<List>> {
 }
 
 async fn fetch_bookmark_lists(
+    config: &conf::Config,
     bookmark_id: &String,
     list_id_map: &HashMap<&String, &List>,
 ) -> Result<Vec<List>> {
-    let url = env::var("KARAKEEP_URL")?;
-    let key = env::var("KARAKEEP_API_KEY")?;
+    let url = &config.url;
+    let key = &config.api_key;
 
     let client = reqwest::Client::builder().build()?;
 
