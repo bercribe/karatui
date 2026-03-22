@@ -41,6 +41,11 @@
         };
       }
     );
+    homeModules = let
+      module = import ./module.nix;
+    in {
+      default = module;
+      karatui = module;
+    };
   };
 }
-
