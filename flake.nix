@@ -9,13 +9,8 @@
     self,
     nixpkgs,
   }: let
-    forAllSystems = function:
-      nixpkgs.lib.genAttrs [
-        "x86_64-linux"
-        "aarch64-linux"
-        "x86_64-darwin"
-        "aarch64-darwin"
-      ] (system: function system);
+    systems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
+    forAllSystems = nixpkgs.lib.genAttrs systems;
   in {
     packages = forAllSystems (
       system: let
@@ -23,22 +18,7 @@
       in {
         default = self.packages.${system}.karatui;
 
-        karatui = pkgs.rustPlatform.buildRustPackage {
-          pname = "karatui";
-          version = "0.1.0";
-
-          src = ./.;
-
-          cargoLock.lockFile = ./Cargo.lock;
-
-          nativeBuildInputs = with pkgs; [
-            pkg-config
-          ];
-
-          buildInputs = with pkgs; [
-            openssl
-          ];
-        };
+        karatui = pkgs.callPackage ./package.nix {};
       }
     );
     homeModules = let
