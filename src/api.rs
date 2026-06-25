@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::conf;
@@ -100,6 +101,17 @@ struct TagUpdateRequest {
     tags: Vec<TagUpdate>,
 }
 
+async fn parse_response<T: DeserializeOwned>(
+    response: reqwest::Response,
+    context: &str,
+) -> Result<T> {
+    let body = response
+        .text()
+        .await
+        .context(format!("Failed to read response body for: {}", context))?;
+    serde_json::from_str(&body).context(format!("{}: {}", context, body))
+}
+
 pub async fn fetch_bookmarks(config: &conf::Config) -> Result<Vec<Bookmark>> {
     let url = &config.url;
     let key = &config.api_key;
@@ -123,7 +135,7 @@ pub async fn fetch_bookmarks(config: &conf::Config) -> Result<Vec<Bookmark>> {
             .headers(headers);
 
         let response = request.send().await?;
-        let body: BookmarksResponse = response.json().await?;
+        let body: BookmarksResponse = parse_response(response, "get bookmarks").await?;
 
         api_bookmarks.extend(body.bookmarks);
 
@@ -190,6 +202,8 @@ pub async fn save_bookmarks(config: &conf::Config, bookmarks: &[&Bookmark]) -> R
         .iter()
         .flat_map(|b| &b.tags)
         .filter(|t| !tag_id_map.contains_key(t.to_owned()))
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
         .collect();
 
     let client = reqwest::Client::builder().build()?;
@@ -207,7 +221,8 @@ pub async fn save_bookmarks(config: &conf::Config, bookmarks: &[&Bookmark]) -> R
             .json(&request_body);
 
         let response = request.send().await?;
-        let body: CreateTagResponse = response.json().await?;
+        let body: CreateTagResponse =
+            parse_response(response, &format!("create tag '{}'", tag)).await?;
 
         tag_id_map.insert(body.name, body.id);
     }
@@ -225,7 +240,8 @@ pub async fn save_bookmarks(config: &conf::Config, bookmarks: &[&Bookmark]) -> R
             .headers(headers);
 
         let response = request.send().await?;
-        let body: ApiBookmark = response.json().await?;
+        let body: ApiBookmark =
+            parse_response(response, &format!("get bookmark '{}'", bookmark.id)).await?;
 
         let current_tags: Vec<&String> = body.tags.iter().map(|t| &t.name).collect();
         let tags_to_add: Vec<&String> = bookmark
@@ -362,7 +378,7 @@ async fn fetch_tags(config: &conf::Config) -> Result<Vec<Tag>> {
             .headers(headers);
 
         let response = request.send().await?;
-        let body: TagsResponse = response.json().await?;
+        let body: TagsResponse = parse_response(response, "get tags").await?;
 
         tags.extend(body.tags);
 
@@ -389,7 +405,7 @@ async fn fetch_lists(config: &conf::Config) -> Result<Vec<List>> {
         .headers(headers);
 
     let response = request.send().await?;
-    let body: ListsResponse = response.json().await?;
+    let body: ListsResponse = parse_response(response, "get lists").await?;
 
     let lists_map: HashMap<&String, &ApiList> = body.lists.iter().map(|l| (&l.id, l)).collect();
     let lists = body
@@ -433,7 +449,8 @@ async fn fetch_bookmark_lists(
         .headers(headers);
 
     let response = request.send().await?;
-    let body: ListsResponse = response.json().await?;
+    let body: ListsResponse =
+        parse_response(response, &format!("get bookmark '{}' lists", bookmark_id)).await?;
 
     let lists = body
         .lists
